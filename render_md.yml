@@ -1,0 +1,26 @@
+---
+- name: Render Multi-Server VA Report (Markdown)
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    merged_file: "/tmp/awx_va_merged.json"
+    report_md: "/tmp/VA_Report_{{ lookup('pipe','date +%Y-%m-%d_%H%M%S') }}.md"
+    title: "Internal Vulnerability Assessment – Multi-Server"
+
+  tasks:
+    - name: Read merged JSON
+      set_fact:
+        va_data: "{{ lookup('file', merged_file) | from_json }}"
+
+    - name: Create Markdown from Jinja template
+      template:
+        src: "report.md.j2"
+        dest: "{{ report_md }}"
+      vars:
+        title: "{{ title }}"
+        va_data: "{{ va_data }}"
+
+    - name: Show path to generated report
+      debug:
+        msg: "Markdown report generated at {{ report_md }}"

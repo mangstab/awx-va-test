@@ -1,0 +1,63 @@
+# {{ title }}
+
+Generated at: {{ '%Y-%m-%d %H:%M:%S' | strftime() }}
+
+Total hosts: **{{ va_data | length }}**
+
+## Consolidated Environment Overview
+
+| Host | IP | Kernel |
+|------|----|--------|
+{% for h in va_data %}
+| {{ h.host }} | {{ h.ip }} | {{ (h.kernel or '') | replace('\n',' ') | truncate(60) }} |
+{% endfor %}
+
+---
+
+## Findings (Qualitative, from collected data)
+- Pending updates are listed under each host (see "Upgradable Packages").
+- Open ports and effective SSH configuration are captured for review.
+- Security status output included where available.
+
+---
+
+{% for h in va_data %}
+### Appendix – {{ h.host }} ({{ h.ip }})
+
+**Kernel:**
+```
+{{ h.kernel or '' }}
+```
+
+**OS Release:**
+```
+{{ h.os_release or '' }}
+```
+
+**Upgradable Packages:**
+```
+{{ h.upgradable or '' }}
+```
+
+**Open Ports / Services (ss -tulnp):**
+```
+{{ h.ports or '' }}
+```
+
+**SSHD Effective Config (sshd -T):**
+```
+{{ h.sshd_T or '' }}
+```
+
+**Systemd Services (summary):**
+```
+{{ h.services or '' }}
+```
+
+**Security Status:**
+```
+{{ h.security_status or '' }}
+```
+
+---
+{% endfor %}

@@ -1,0 +1,33 @@
+---
+- name: Merge VA JSON results into one consolidated file
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    va_results_dir: "/tmp/awx_va_results"
+    merged_file: "/tmp/awx_va_merged.json"
+
+  tasks:
+    - name: Find per-host JSON files
+      find:
+        paths: "{{ va_results_dir }}"
+        patterns: "va_*.json"
+      register: found
+
+    - name: Initialize list
+      set_fact:
+        merged_list: []
+
+    - name: Read each JSON and append
+      set_fact:
+        merged_list: "{{ merged_list + [ (lookup('file', item.path) | from_json) ] }}"
+      loop: "{{ found.files | sort(attribute='path') }}"
+
+    - name: Write merged JSON
+      copy:
+        dest: "{{ merged_file }}"
+        content: "{{ merged_list | to_nice_json }}"
+
+    - name: Show summary counts
+      debug:
+        msg: "Merged {{ merged_list | length }} hosts into {{ merged_file }}"
