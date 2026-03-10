@@ -1,0 +1,93 @@
+---
+- name: Collect VA Evidence (per host)
+  hosts: all
+  gather_facts: true  # to get ansible_date_time and IP facts
+  become: false
+
+  vars:
+    va_remote_dir: "/tmp/awx_va"
+    va_results_dir: "/tmp/awx_va_results"   # on controller (AWX)
+    use_sudo_for_network_checks: true        # set to false if sudo not available
+    security_status_cmd: "pro security-status || ubuntu-security-status || true"
+
+  tasks:
+    - name: Ensure output dir on target
+      file:
+        path: "{{ va_remote_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Collect /etc/os-release
+      shell: "cat /etc/os-release || true"
+      register: osrelease
+
+    - name: Collect kernel (uname -a)
+      command: uname -a
+      register: kernel
+
+    - name: Refresh apt cache (optional)
+      command: apt-get update -y
+      register: aptupdate
+      changed_when: false
+      failed_when: false
+
+    - name: List upgradable packages
+      shell: "apt list --upgradable 2>/dev/null || true"
+      register: upgradable
+
+    - name: Open ports / services (ss -tulnp)
+      shell: "ss -tulnp || true"
+      register: ports
+      become: "{{ use_sudo_for_network_checks }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Effective SSHD configuration (sshd -T)
+      shell: "sshd -T || true"
+      register: sshd
+
+    - name: Systemd services (summary)
+      shell: "systemctl list-units --type=service --no-pager || true"
+      register: services
+      become: "{{ use_sudo_for_network_checks }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Security status (Ubuntu Pro / legacy)
+      shell: "{{ security_status_cmd }}"
+      register: secstat
+
+    - name: Build per-host JSON on target
+      copy:
+        dest: "{{ va_remote_dir }}/va_{{ inventory_hostname }}.json"
+        content: |
+          {
+            "host": "{{ inventory_hostname }}",
+            "ip": "{{ ansible_default_ipv4.address | default(hostvars[inventory_hostname].ansible_host | default('')) }}",
+            "os_release": {{ osrelease.stdout | to_json }},
+            "kernel": {{ kernel.stdout | to_json }},
+            "upgradable": {{ upgradable.stdout | to_json }},
+            "ports": {{ ports.stdout | to_json }},
+            "sshd_T": {{ sshd.stdout | to_json }},
+            "services": {{ services.stdout | to_json }},
+            "security_status": {{ secstat.stdout | to_json }},
+            "collected_at": "{{ ansible_date_time.iso8601 }}"
+          }
+
+    - name: Ensure results dir exists on controller
+      delegate_to: localhost
+      file:
+        path: "{{ va_results_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Fetch JSON to controller
+      fetch:
+        src: "{{ va_remote_dir }}/va_{{ inventory_hostname }}.json"
+        dest: "{{ va_results_dir }}/"
+        flat: yes
+
+    - name: Expose host artifact in AWX job output
+      set_stats:
+        data:
+          "va_{{ inventory_hostname }}": "{{ lookup('file', va_results_dir + '/va_' + inventory_hostname + '.json') }}"
