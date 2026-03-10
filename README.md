@@ -60,15 +60,15 @@ Use the merged JSON to build the Consolidated Overview and per‑server Appendix
 
 ---
 
-📑 VA Report Generation
-Option A — Manual
+## 📑 VA Report Generation
+### Option A — Manual
 Open Multi-Server_Internal_VA_Report_Template.docx and populate:
 
 Consolidated overview
 Per‑server appendix pages
 Findings summary
 
-Option B — Automated (recommended)
+### Option B — Automated (recommended)
 Run render_docx.yml with:
 
 Input: awx_va_merged.json + report template .docx
@@ -76,7 +76,7 @@ Output: fully formatted multi‑server VA report (.docx)
 
 ---
 
-🛠 Commands Collected (read‑only, safe for production)
+## 🛠 Commands Collected (read‑only, safe for production)
 
 uname -a
 cat /etc/os-release
@@ -88,7 +88,7 @@ pro security-status or ubuntu-security-status
 
 ---
 
-🔐 Security Notes
+## 🔐 Security Notes
 
 No configuration changes or package installations
 SSH credentials stored securely in AWX
@@ -97,7 +97,7 @@ Suitable for SOC 2, ISO 27001, and internal audits
 
 ---
 
-✔️ Compliance Alignment
+## ✔️ Compliance Alignment
 
 SOC 2 CC7.1 – Vulnerability Management
 SOC 2 CC7.2 – Monitoring & Detection
@@ -106,7 +106,7 @@ Multi‑environment, multi‑region coverage
 
 ---
 
-🙋 Extending the Collector
+## 🙋 Extending the Collector
 Add tasks to collect_va.yml (or create a role) to include:
 
 CIS hardening checks
