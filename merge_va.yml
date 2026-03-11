@@ -1,11 +1,10 @@
 ---
+# Merge JSON from artifacts
 - name: Merge VA JSON results (use artifacts from Collect node)
   hosts: localhost
   gather_facts: false
 
   vars:
-    # Ambil dari Workflow Artifacts:
-    # Templates → Node “Merge VA Results” → PROMPT vars below (optional)
     va_results_dir: "{{ job_artifacts['Collect VA Evidence'].va_results_dir }}"
     va_json_files: "{{ job_artifacts['Collect VA Evidence'].va_json_files }}"
     merged_file: "/runner/va_results/awx_va_merged.json"
