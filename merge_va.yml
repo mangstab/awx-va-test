@@ -1,11 +1,10 @@
 ---
-# Merge JSON from artifacts
+# Merge JSON from workflow artifacts (FIX FINAL)
 - name: Merge VA JSON results (use artifacts from Collect node)
   hosts: localhost
   gather_facts: false
 
   vars:
-    va_results_dir: "{{ job_artifacts['Collect VA Evidence'].va_results_dir }}"
     va_json_files: "{{ job_artifacts['Collect VA Evidence'].va_json_files }}"
     merged_file: "/runner/va_results/awx_va_merged.json"
 
@@ -19,6 +18,12 @@
       set_fact:
         merged_list: "{{ (merged_list | default([])) + [ lookup('file', item) | from_json ] }}"
       loop: "{{ va_json_files }}"
+
+    - name: Ensure output dir exists
+      file:
+        path: "{{ merged_file | dirname }}"
+        state: directory
+        mode: '0755'
 
     - name: Write merged JSON
       copy:
