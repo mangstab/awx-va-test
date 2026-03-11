@@ -1,4 +1,5 @@
 ---
+# Collect VA Evidence and publish artifacts
 - name: Collect VA Evidence (per host)
   hosts: all
   gather_facts: true
@@ -6,7 +7,7 @@
 
   vars:
     va_remote_dir: "/tmp/awx_va"
-    va_results_dir: "/runner/va_results"   # gunakan path yang ada di setiap EE container
+    va_results_dir: "/runner/va_results"
     security_status_cmd: "pro security-status || ubuntu-security-status || true"
     use_sudo_for_network_checks: true
 
@@ -87,7 +88,7 @@
         dest: "{{ va_results_dir }}/"
         flat: yes
 
-# Publish artifacts di node localhost (sekali saja)
+# Publish artifact list
 - name: Publish VA files list (Artifacts)
   hosts: localhost
   gather_facts: false
@@ -96,7 +97,7 @@
   tasks:
     - name: Build glob list of collected JSON
       set_fact:
-        va_json_files: "{{ query('fileglob', va_results_dir ~ '/va_*.json') }}"
+        va_json_files: "{{ query('fileglob', va_results_dir + '/va_*.json') }}"
 
     - name: Publish artifacts for workflow
       set_stats:
