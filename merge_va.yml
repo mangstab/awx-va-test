@@ -1,33 +1,33 @@
 ---
-- name: Merge VA JSON results into one consolidated file
+- name: Merge VA JSON results (use artifacts from Collect node)
   hosts: localhost
   gather_facts: false
 
   vars:
-    va_results_dir: "/tmp/awx_va_results"
-    merged_file: "/tmp/awx_va_merged.json"
+    # Ambil dari Workflow Artifacts:
+    # Templates → Node “Merge VA Results” → PROMPT vars below (optional)
+    va_results_dir: "{{ job_artifacts['Collect VA Evidence'].va_results_dir }}"
+    va_json_files: "{{ job_artifacts['Collect VA Evidence'].va_json_files }}"
+    merged_file: "/runner/va_results/awx_va_merged.json"
 
   tasks:
-    - name: Find per-host JSON files
-      find:
-        paths: "{{ va_results_dir }}"
-        patterns: "va_*.json"
-      register: found
+    - name: Fail early if no artifacts
+      fail:
+        msg: "No VA JSON files from Collect job."
+      when: va_json_files | default([]) | length == 0
 
-    - name: Initialize list
+    - name: Read each JSON and build merged array
       set_fact:
-        merged_list: []
-
-    - name: Read each JSON and append
-      set_fact:
-        merged_list: "{{ merged_list + [ (lookup('file', item.path) | from_json) ] }}"
-      loop: "{{ found.files | sort(attribute='path') }}"
+        merged_list: "{{ (merged_list | default([])) + [ lookup('file', item) | from_json ] }}"
+      loop: "{{ va_json_files }}"
 
     - name: Write merged JSON
       copy:
         dest: "{{ merged_file }}"
         content: "{{ merged_list | to_nice_json }}"
 
-    - name: Show summary counts
-      debug:
-        msg: "Merged {{ merged_list | length }} hosts into {{ merged_file }}"
+    - name: Publish merged file path
+      set_stats:
+        data:
+          merged_json_file: "{{ merged_file }}"
+          merged_hosts_count: "{{ merged_list | length }}"
