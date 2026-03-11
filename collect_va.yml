@@ -1,5 +1,5 @@
 ---
-# Collect VA Evidence and publish artifacts
+# Collect VA Evidence and publish artifacts (FIX FINAL)
 - name: Collect VA Evidence (per host)
   hosts: all
   gather_facts: true
@@ -7,6 +7,7 @@
 
   vars:
     va_remote_dir: "/tmp/awx_va"
+    # NOTE: fetch will still store under AWX artifacts; va_results_dir is used as a staging folder if needed
     va_results_dir: "/runner/va_results"
     security_status_cmd: "pro security-status || ubuntu-security-status || true"
     use_sudo_for_network_checks: true
@@ -75,33 +76,38 @@
             "collected_at": "{{ ansible_date_time.iso8601 }}"
           }
 
-    - name: Ensure controller result dir exists
+    - name: Ensure controller result dir exists (optional)
       delegate_to: localhost
       file:
         path: "{{ va_results_dir }}"
         state: directory
         mode: '0755'
 
-    - name: Fetch JSON to controller
+    - name: Fetch JSON to controller artifacts
       fetch:
         src: "{{ va_remote_dir }}/va_{{ inventory_hostname }}.json"
         dest: "{{ va_results_dir }}/"
         flat: yes
 
-# Publish artifact list
+# Publish artifact list using AWX artifacts directory (reliable across jobs)
 - name: Publish VA files list (Artifacts)
   hosts: localhost
   gather_facts: false
-  vars:
-    va_results_dir: "/runner/va_results"
   tasks:
-    - name: Build glob list of collected JSON
+    - name: Discover AWX artifacts directory for this job
       set_fact:
-        va_json_files: "{{ query('fileglob', va_results_dir + '/va_*.json') }}"
+        artifact_dir: "/runner/artifacts/{{ ansible_job_id }}"
+
+    - name: Build list of VA JSON files inside artifacts dir
+      set_fact:
+        va_json_files: >-
+          {{ lookup('pipe', 'ls -1 ' ~ artifact_dir)
+             | regex_findall('va_.*\\.json')
+             | map('regex_replace', '^', artifact_dir ~ '/') | list }}
 
     - name: Publish artifacts for workflow
       set_stats:
         data:
-          va_results_dir: "{{ va_results_dir }}"
+          va_artifact_dir: "{{ artifact_dir }}"
           va_json_files: "{{ va_json_files }}"
           va_hosts_count: "{{ va_json_files | length }}"
