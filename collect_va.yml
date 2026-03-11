@@ -1,5 +1,5 @@
 ---
-# Collect VA Evidence and publish artifacts (ENV-JOB-ID FIX + quieter output)
+# Collect VA Evidence and publish artifacts (ENV-JOB-ID FIX split tasks + quieter output)
 - name: Collect VA Evidence (per host)
   hosts: all
   gather_facts: true
@@ -7,7 +7,7 @@
 
   vars:
     va_remote_dir: "/tmp/awx_va"
-    va_results_dir: "/runner/va_results"   # staging (fetch will still land under AWX artifacts)
+    va_results_dir: "/runner/va_results"
     security_status_cmd: "pro security-status || ubuntu-security-status || true"
     use_sudo_for_network_checks: true
 
@@ -98,12 +98,15 @@
   hosts: localhost
   gather_facts: false
   tasks:
-    - name: Discover AWX artifacts directory for this job (env-based)
+    - name: Discover AWX job id from environment
       set_fact:
         _awx_job_id: >-
           {{ lookup('env','AWX_JOB_ID')
              | default(lookup('env','JOB_ID'), true)
              | default(tower_job_id | default(job_id, true), true) }}
+
+    - name: Build artifact dir path
+      set_fact:
         artifact_dir: "/runner/artifacts/{{ _awx_job_id }}"
 
     - name: Build list of VA JSON files inside artifacts dir
