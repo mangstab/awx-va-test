@@ -1,63 +1,76 @@
+
 # {{ title }}
 
-Generated at: {{ '%Y-%m-%d %H:%M:%S' | strftime() }}
-
+Generated: {{ '%Y-%m-%d %H:%M:%S %Z' | strftime() }}
 Total hosts: **{{ va_data | length }}**
 
-## Consolidated Environment Overview
+> Notes:
+> - This report is generated automatically from AWX workflow.
+> - Source: merged JSON artifact (`merged_json_file` from the "Merge VA Results" node).
+> - Fields may be blank if the command was not available on a host.
 
-| Host | IP | Kernel |
-|------|----|--------|
-{% for h in va_data %}
-| {{ h.host }} | {{ h.ip }} | {{ (h.kernel or '') | replace('\n',' ') | truncate(60) }} |
+---
+
+## 1) Consolidated Environment Overview
+
+| Host | IP | Kernel (short) |
+|------|----|-----------------|
+{% for h in va_data | sort(attribute='host') -%}
+| {{ h.host | default('') }} | {{ h.ip | default('') }} | {{ (h.kernel | default('') | replace('
+', ' ') )[:80] }} |
 {% endfor %}
 
 ---
 
-## Findings (Qualitative, from collected data)
-- Pending updates are listed under each host (see "Upgradable Packages").
-- Open ports and effective SSH configuration are captured for review.
-- Security status output included where available.
+## 2) High-level Observations (qualitative)
+- **Package updates:** Please review the *Upgradable Packages* section per host. If a host lists many upgradable packages, schedule patching accordingly (Critical/High first).  
+- **Network exposure:** See *Open Ports* per host (from `ss -tulnp`). Validate each published port is required, and restrict externally where possible.  
+- **SSHD hardening:** Confirm `PasswordAuthentication no`, acceptable ciphers/MACs, and non‑standard SSH port is documented.  
+- **Service footprint:** Review `systemd` service list (disabled/unused services should be removed or disabled).
+
+> These observations are guidance; treat them as inputs to your VA remediation plan (SOC 2 CC7.1/CC7.2).
 
 ---
 
-{% for h in va_data %}
-### Appendix – {{ h.host }} ({{ h.ip }})
+{% for h in va_data | sort(attribute='host') %}
+## Appendix – {{ h.host | default('') }} ({{ h.ip | default('unknown ip') }})
 
-**Kernel:**
-```
-{{ h.kernel or '' }}
-```
-
-**OS Release:**
-```
-{{ h.os_release or '' }}
+**Kernel**
+```text
+{{ h.kernel | default('') }}
 ```
 
-**Upgradable Packages:**
-```
-{{ h.upgradable or '' }}
-```
-
-**Open Ports / Services (ss -tulnp):**
-```
-{{ h.ports or '' }}
+**OS Release**
+```text
+{{ h.os_release | default('') }}
 ```
 
-**SSHD Effective Config (sshd -T):**
-```
-{{ h.sshd_T or '' }}
-```
-
-**Systemd Services (summary):**
-```
-{{ h.services or '' }}
+**Upgradable Packages**
+```text
+{{ h.upgradable | default('') }}
 ```
 
-**Security Status:**
+**Open Ports (ss -tulnp)**
+```text
+{{ h.ports | default('') }}
 ```
-{{ h.security_status or '' }}
+
+**SSHD Effective Config**
+```text
+{{ h.sshd_T | default('') }}
 ```
+
+**Systemd Services**
+```text
+{{ h.services | default('') }}
+```
+
+**Security Status (pro / ubuntu-security-status)**
+```text
+{{ h.security_status | default('') }}
+```
+
+**Collected at:** `{{ h.collected_at | default('') }}`
 
 ---
 {% endfor %}
