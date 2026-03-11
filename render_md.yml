@@ -1,5 +1,5 @@
 ---
-# Render MD from merged JSON
+# Render MD from merged JSON (FIX FINAL)
 - name: Render Multi-Server VA Report (Markdown)
   hosts: localhost
   gather_facts: false
@@ -10,6 +10,16 @@
     title: "Internal Vulnerability Assessment – Multi-Server"
 
   tasks:
+    - name: Validate merged file exists
+      stat:
+        path: "{{ merged_file }}"
+      register: mf
+
+    - name: Fail if merged file missing
+      fail:
+        msg: "Merged JSON file not found: {{ merged_file }}"
+      when: not mf.stat.exists
+
     - name: Read merged JSON
       set_fact:
         va_data: "{{ lookup('file', merged_file) | from_json }}"
