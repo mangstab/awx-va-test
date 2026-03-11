@@ -1,5 +1,5 @@
 ---
-# Collect VA Evidence and publish artifacts (FIX FINAL)
+# Collect VA Evidence and publish artifacts (ENV-JOB-ID FIX + quieter output)
 - name: Collect VA Evidence (per host)
   hosts: all
   gather_facts: true
@@ -7,8 +7,7 @@
 
   vars:
     va_remote_dir: "/tmp/awx_va"
-    # NOTE: fetch will still store under AWX artifacts; va_results_dir is used as a staging folder if needed
-    va_results_dir: "/runner/va_results"
+    va_results_dir: "/runner/va_results"   # staging (fetch will still land under AWX artifacts)
     security_status_cmd: "pro security-status || ubuntu-security-status || true"
     use_sudo_for_network_checks: true
 
@@ -22,10 +21,12 @@
     - name: Read /etc/os-release
       shell: "cat /etc/os-release || true"
       register: osrelease
+      changed_when: false
 
     - name: Read kernel version
       command: uname -a
       register: kernel
+      changed_when: false
 
     - name: Refresh apt cache (non-fatal)
       command: apt-get update -y
@@ -36,6 +37,7 @@
     - name: List upgradable packages
       shell: "apt list --upgradable 2>/dev/null || true"
       register: upgradable
+      changed_when: false
 
     - name: Read open ports (ss)
       shell: "ss -tulnp || true"
@@ -47,6 +49,7 @@
     - name: Read SSHD effective config
       shell: "sshd -T || true"
       register: sshd
+      changed_when: false
 
     - name: Read systemd services
       shell: "systemctl list-units --type=service --no-pager || true"
@@ -58,6 +61,7 @@
     - name: Read Ubuntu security status
       shell: "{{ security_status_cmd }}"
       register: secstat
+      changed_when: false
 
     - name: Write per-host VA JSON to remote
       copy:
@@ -89,14 +93,18 @@
         dest: "{{ va_results_dir }}/"
         flat: yes
 
-# Publish artifact list using AWX artifacts directory (reliable across jobs)
+# Publish artifact list using AWX artifacts directory (robust across jobs)
 - name: Publish VA files list (Artifacts)
   hosts: localhost
   gather_facts: false
   tasks:
-    - name: Discover AWX artifacts directory for this job
+    - name: Discover AWX artifacts directory for this job (env-based)
       set_fact:
-        artifact_dir: "/runner/artifacts/{{ ansible_job_id }}"
+        _awx_job_id: >-
+          {{ lookup('env','AWX_JOB_ID')
+             | default(lookup('env','JOB_ID'), true)
+             | default(tower_job_id | default(job_id, true), true) }}
+        artifact_dir: "/runner/artifacts/{{ _awx_job_id }}"
 
     - name: Build list of VA JSON files inside artifacts dir
       set_fact:
