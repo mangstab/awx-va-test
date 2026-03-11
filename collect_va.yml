@@ -1,31 +1,31 @@
 ---
 - name: Collect VA Evidence (per host)
   hosts: all
-  gather_facts: true  # to get ansible_date_time and IP facts
+  gather_facts: true
   become: false
 
   vars:
     va_remote_dir: "/tmp/awx_va"
-    va_results_dir: "/tmp/awx_va_results"   # on controller (AWX)
-    use_sudo_for_network_checks: true        # set to false if sudo not available
+    va_results_dir: "/runner/va_results"   # gunakan path yang ada di setiap EE container
     security_status_cmd: "pro security-status || ubuntu-security-status || true"
+    use_sudo_for_network_checks: true
 
   tasks:
-    - name: Ensure output dir on target
+    - name: Ensure remote VA dir exists
       file:
         path: "{{ va_remote_dir }}"
         state: directory
         mode: '0755'
 
-    - name: Collect /etc/os-release
+    - name: Read /etc/os-release
       shell: "cat /etc/os-release || true"
       register: osrelease
 
-    - name: Collect kernel (uname -a)
+    - name: Read kernel version
       command: uname -a
       register: kernel
 
-    - name: Refresh apt cache (optional)
+    - name: Refresh apt cache (non-fatal)
       command: apt-get update -y
       register: aptupdate
       changed_when: false
@@ -35,29 +35,29 @@
       shell: "apt list --upgradable 2>/dev/null || true"
       register: upgradable
 
-    - name: Open ports / services (ss -tulnp)
+    - name: Read open ports (ss)
       shell: "ss -tulnp || true"
       register: ports
       become: "{{ use_sudo_for_network_checks }}"
       changed_when: false
       failed_when: false
 
-    - name: Effective SSHD configuration (sshd -T)
+    - name: Read SSHD effective config
       shell: "sshd -T || true"
       register: sshd
 
-    - name: Systemd services (summary)
+    - name: Read systemd services
       shell: "systemctl list-units --type=service --no-pager || true"
       register: services
       become: "{{ use_sudo_for_network_checks }}"
       changed_when: false
       failed_when: false
 
-    - name: Security status (Ubuntu Pro / legacy)
+    - name: Read Ubuntu security status
       shell: "{{ security_status_cmd }}"
       register: secstat
 
-    - name: Build per-host JSON on target
+    - name: Write per-host VA JSON to remote
       copy:
         dest: "{{ va_remote_dir }}/va_{{ inventory_hostname }}.json"
         content: |
@@ -74,7 +74,7 @@
             "collected_at": "{{ ansible_date_time.iso8601 }}"
           }
 
-    - name: Ensure results dir exists on controller
+    - name: Ensure controller result dir exists
       delegate_to: localhost
       file:
         path: "{{ va_results_dir }}"
@@ -87,7 +87,20 @@
         dest: "{{ va_results_dir }}/"
         flat: yes
 
-    - name: Expose host artifact in AWX job output
+# Publish artifacts di node localhost (sekali saja)
+- name: Publish VA files list (Artifacts)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    va_results_dir: "/runner/va_results"
+  tasks:
+    - name: Build glob list of collected JSON
+      set_fact:
+        va_json_files: "{{ query('fileglob', va_results_dir ~ '/va_*.json') }}"
+
+    - name: Publish artifacts for workflow
       set_stats:
         data:
-          "va_{{ inventory_hostname }}": "{{ lookup('file', va_results_dir + '/va_' + inventory_hostname + '.json') }}"
+          va_results_dir: "{{ va_results_dir }}"
+          va_json_files: "{{ va_json_files }}"
+          va_hosts_count: "{{ va_json_files | length }}"
