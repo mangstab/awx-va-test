@@ -1,10 +1,11 @@
 ---
-- name: Render Multi-Server VA Report (Markdown from merged JSON)
+# Render MD from merged JSON
+- name: Render Multi-Server VA Report (Markdown)
   hosts: localhost
   gather_facts: false
 
   vars:
-    merged_file: "{{ job_artifacts['Merge VA Results'].merged_json_file }}"
+    merged_file: "{{ job_artifacts['Merge VA Result'].merged_json_file }}"
     report_md: "/runner/va_results/VA_Report_{{ lookup('pipe','date +%Y-%m-%d_%H%M%S') }}.md"
     title: "Internal Vulnerability Assessment – Multi-Server"
 
