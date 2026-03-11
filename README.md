@@ -31,7 +31,7 @@ The playbooks collect system information using safe, read‑only Linux commands 
 - **Output:**  
   - `/tmp/awx_va_merged.json` — consolidated VA data for all servers
 
-### C) Workflow (optional)
+### C) Workflow (mandatory)
 Recommended pipeline:
 [ Collect VA ] → [ Merge Results ] → [ Render DOCX Report ]
 
