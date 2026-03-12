@@ -1,5 +1,6 @@
+
 ---
-# Render MD from merged JSON (FIX FINAL)
+# Render MD from merged JSON (Option A)
 - name: Render Multi-Server VA Report (Markdown)
   hosts: localhost
   gather_facts: false
