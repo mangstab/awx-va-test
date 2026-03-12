@@ -1,6 +1,6 @@
 
 ---
-# Render MD from merged JSON (robust: tolerate missing job_artifacts or label mismatch)
+# Render MD from merged JSON (robust v2: split set_fact steps)
 - name: Render Multi-Server VA Report (Markdown)
   hosts: localhost
   gather_facts: false
@@ -9,10 +9,16 @@
     title: "Internal Vulnerability Assessment – Multi-Server"
 
   tasks:
-    - name: Resolve merged file path from workflow artifacts or fallbacks
+    - name: Resolve artifacts object (or empty)
       set_fact:
         _artifacts: "{{ job_artifacts | default({}, true) }}"
+
+    - name: Extract merged_json_file from labeled node if present
+      set_fact:
         _from_labeled: "{{ (_artifacts.get('Merge VA Result', {}) ).get('merged_json_file', '') }}"
+
+    - name: Extract global merged_json_file if present
+      set_fact:
         _from_global: "{{ _artifacts.get('merged_json_file', '') }}"
 
     - name: Decide final merged_file
