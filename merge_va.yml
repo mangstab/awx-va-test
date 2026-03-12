@@ -1,5 +1,6 @@
+
 ---
-# Merge JSON from workflow artifacts (FIX FINAL)
+# Merge JSON from workflow artifacts (Option A clean)
 - name: Merge VA JSON results (use artifacts from Collect node)
   hosts: localhost
   gather_facts: false
@@ -12,7 +13,7 @@
     - name: Fail early if no artifacts
       fail:
         msg: "No VA JSON files from Collect job."
-      when: va_json_files | default([]) | length == 0
+      when: (va_json_files | default([])) | length == 0
 
     - name: Read each JSON and build merged array
       set_fact:
