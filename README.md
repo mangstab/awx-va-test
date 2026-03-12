@@ -1,4 +1,4 @@
-This directory contains AWX/Ansible playbooks and template for a 3-node workflow:
+This repo contains AWX/Ansible playbooks and template for a 3-node workflow:
 
 1. **Collect VA Evidence** → `collect_va.yml` (runs on target inventory hosts)
 2. **Merge VA Result** → `merge_va.yml` (runs on localhost/controller)
