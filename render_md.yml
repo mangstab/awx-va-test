@@ -1,6 +1,6 @@
 
 ---
-# Render MD from merged JSON (robust v2: split set_fact steps)
+# Render MD from merged JSON or payload (no filesystem dependency)
 - name: Render Multi-Server VA Report (Markdown)
   hosts: localhost
   gather_facts: false
@@ -13,34 +13,34 @@
       set_fact:
         _artifacts: "{{ job_artifacts | default({}, true) }}"
 
-    - name: Extract merged_json_file from labeled node if present
+    - name: Extract payload and file hints
       set_fact:
-        _from_labeled: "{{ (_artifacts.get('Merge VA Result', {}) ).get('merged_json_file', '') }}"
+        _payload: "{{ (_artifacts.get('Merge VA Result', {}) ).get('merged_json_payload', _artifacts.get('merged_json_payload', [])) }}"
+        _file: "{{ (_artifacts.get('Merge VA Result', {}) ).get('merged_json_file', _artifacts.get('merged_json_file', '')) }}"
 
-    - name: Extract global merged_json_file if present
+    - name: Decide source
       set_fact:
-        _from_global: "{{ _artifacts.get('merged_json_file', '') }}"
+        use_payload: "{{ (_payload | length) > 0 }}"
+        merged_file: "{{ _file if _file else (lookup('env','MERGED_JSON_FILE') | default('/runner/va_results/awx_va_merged.json', true)) }}"
 
-    - name: Decide final merged_file
+    - name: When using payload, set va_data directly
+      when: use_payload
       set_fact:
-        merged_file: >-
-          {{ (_from_labeled if _from_labeled else (_from_global if _from_global else lookup('env','MERGED_JSON_FILE') | default('/runner/va_results/awx_va_merged.json', true))) }}
+        va_data: "{{ _payload }}"
 
-    - name: Show chosen merged_file (debug)
-      debug:
-        var: merged_file
-
-    - name: Validate merged file exists
+    - name: When using file, validate exists
+      when: not use_payload
       stat:
         path: "{{ merged_file }}"
       register: mf
 
-    - name: Fail if merged file missing
+    - name: Fail if merged file missing (file mode)
+      when: not use_payload and (not mf.stat.exists)
       fail:
-        msg: "Merged JSON file not found: {{ merged_file }} (job_artifacts may be missing in this node)"
-      when: not mf.stat.exists
+        msg: "Merged JSON file not found: {{ merged_file }}"
 
-    - name: Read merged JSON
+    - name: Read merged JSON (file mode)
+      when: not use_payload
       set_fact:
         va_data: "{{ lookup('file', merged_file) | from_json }}"
 
