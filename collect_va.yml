@@ -1,6 +1,6 @@
 
 ---
-# Collect VA Evidence and publish artifacts (Option A: store files under artifact_dir)
+# Collect VA Evidence and publish artifacts (Option A v3: pass JSON payloads via set_stats)
 - name: Collect VA Evidence (per host)
   hosts: all
   gather_facts: true
@@ -80,8 +80,7 @@
             "collected_at": "{{ ansible_date_time.iso8601 }}"
           }
 
-    # ========= Controller-side stage (artifacts) =========
-- name: Publish VA files list (Artifacts)
+- name: Publish VA files & payloads (Artifacts)
   hosts: localhost
   gather_facts: false
   tasks:
@@ -117,9 +116,16 @@
         file_type: file
       register: found_artifacts
 
-    - name: Publish artifacts for workflow
+    - name: Build JSON payloads from files (portable across nodes)
+      set_fact:
+        va_json_payloads: >-
+          {{ (va_json_payloads | default([])) + [ lookup('file', item.path) | from_json ] }}
+      loop: "{{ found_artifacts.files | default([]) }}"
+
+    - name: Publish artifacts for workflow (paths + payloads)
       set_stats:
         data:
           va_artifact_dir: "{{ artifact_dir }}"
           va_json_files: "{{ found_artifacts.files | map(attribute='path') | list }}"
-          va_hosts_count: "{{ (found_artifacts.files | length) | string }}"
+          va_json_payloads: "{{ va_json_payloads | default([]) }}"
+          va_hosts_count: "{{ ( (va_json_payloads | default([])) | length ) | string }}"
