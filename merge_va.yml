@@ -1,24 +1,30 @@
 
 ---
-# Merge JSON from workflow artifacts (Option A clean)
+# Merge JSON from workflow artifacts (Option A v3: prefer payloads over file lookups)
 - name: Merge VA JSON results (use artifacts from Collect node)
   hosts: localhost
   gather_facts: false
 
   vars:
-    va_json_files: "{{ job_artifacts['Collect VA Evidence'].va_json_files }}"
+    va_json_payloads: "{{ job_artifacts['Collect VA Evidence'].va_json_payloads | default([]) }}"
+    va_json_files: "{{ job_artifacts['Collect VA Evidence'].va_json_files | default([]) }}"
     merged_file: "/runner/va_results/awx_va_merged.json"
 
   tasks:
-    - name: Fail early if no artifacts
-      fail:
-        msg: "No VA JSON files from Collect job."
-      when: (va_json_files | default([])) | length == 0
+    - name: Decide source data
+      set_fact:
+        merged_list: "{{ va_json_payloads if (va_json_payloads | length) > 0 else [] }}"
 
-    - name: Read each JSON and build merged array
+    - name: If no payloads, read each JSON file (legacy path)
+      when: merged_list | length == 0
       set_fact:
         merged_list: "{{ (merged_list | default([])) + [ lookup('file', item) | from_json ] }}"
       loop: "{{ va_json_files }}"
+
+    - name: Fail if still empty
+      fail:
+        msg: "No VA data available from Collect job (payloads/files missing)."
+      when: merged_list | length == 0
 
     - name: Ensure output dir exists
       file:
