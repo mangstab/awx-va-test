@@ -1,4 +1,3 @@
-
 ---
 # Merge JSON from workflow artifacts (publish payload for downstream nodes)
 - name: Merge VA JSON results (use artifacts from Collect node)
