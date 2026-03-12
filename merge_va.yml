@@ -1,6 +1,6 @@
 
 ---
-# Merge JSON from workflow artifacts (Option A v3: prefer payloads over file lookups)
+# Merge JSON from workflow artifacts (publish payload for downstream nodes)
 - name: Merge VA JSON results (use artifacts from Collect node)
   hosts: localhost
   gather_facts: false
@@ -37,8 +37,9 @@
         dest: "{{ merged_file }}"
         content: "{{ merged_list | to_nice_json }}"
 
-    - name: Publish merged file path
+    - name: Publish merged file path + payload
       set_stats:
         data:
           merged_json_file: "{{ merged_file }}"
           merged_hosts_count: "{{ merged_list | length }}"
+          merged_json_payload: "{{ merged_list }}"
