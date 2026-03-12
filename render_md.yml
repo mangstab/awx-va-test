@@ -1,4 +1,3 @@
-
 ---
 # Render MD from merged JSON or payload (no filesystem dependency)
 - name: Render Multi-Server VA Report (Markdown)
