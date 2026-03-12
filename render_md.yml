@@ -1,16 +1,29 @@
 
 ---
-# Render MD from merged JSON (Option A v3)
+# Render MD from merged JSON (robust: tolerate missing job_artifacts or label mismatch)
 - name: Render Multi-Server VA Report (Markdown)
   hosts: localhost
   gather_facts: false
 
   vars:
-    merged_file: "{{ job_artifacts['Merge VA Result'].merged_json_file }}"
-    report_md: "/runner/va_results/VA_Report_{{ lookup('pipe','date +%Y-%m-%d_%H%M%S') }}.md"
     title: "Internal Vulnerability Assessment – Multi-Server"
 
   tasks:
+    - name: Resolve merged file path from workflow artifacts or fallbacks
+      set_fact:
+        _artifacts: "{{ job_artifacts | default({}, true) }}"
+        _from_labeled: "{{ (_artifacts.get('Merge VA Result', {}) ).get('merged_json_file', '') }}"
+        _from_global: "{{ _artifacts.get('merged_json_file', '') }}"
+
+    - name: Decide final merged_file
+      set_fact:
+        merged_file: >-
+          {{ (_from_labeled if _from_labeled else (_from_global if _from_global else lookup('env','MERGED_JSON_FILE') | default('/runner/va_results/awx_va_merged.json', true))) }}
+
+    - name: Show chosen merged_file (debug)
+      debug:
+        var: merged_file
+
     - name: Validate merged file exists
       stat:
 ---
@@ -74,12 +87,16 @@
 
     - name: Fail if merged file missing
       fail:
-        msg: "Merged JSON file not found: {{ merged_file }}"
+        msg: "Merged JSON file not found: {{ merged_file }} (job_artifacts may be missing in this node)"
       when: not mf.stat.exists
 
     - name: Read merged JSON
       set_fact:
         va_data: "{{ lookup('file', merged_file) | from_json }}"
+
+    - name: Build report path with timestamp
+      set_fact:
+        report_md: "/runner/va_results/VA_Report_{{ lookup('pipe','date +%Y-%m-%d_%H%M%S') }}.md"
 
     - name: Render Markdown
       template:
