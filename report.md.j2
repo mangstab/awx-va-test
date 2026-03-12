@@ -1,76 +1,38 @@
 
 # {{ title }}
 
-Generated: {{ '%Y-%m-%d %H:%M:%S %Z' | strftime() }}
-Total hosts: **{{ va_data | length }}**
+Generated at: {{ lookup('pipe','date -u +%Y-%m-%dT%H:%M:%SZ') }} UTC
 
-> Notes:
-> - This report is generated automatically from AWX workflow.
-> - Source: merged JSON artifact (`merged_json_file` from the "Merge VA Results" node).
-> - Fields may be blank if the command was not available on a host.
+## Summary
+- Total hosts: {{ va_data | length }}
 
----
-
-## 1) Consolidated Environment Overview
-
-| Host | IP | Kernel (short) |
-|------|----|-----------------|
-{% for h in va_data | sort(attribute='host') -%}
-| {{ h.host | default('') }} | {{ h.ip | default('') }} | {{ (h.kernel | default('') | replace('
-', ' ') )[:80] }} |
-{% endfor %}
-
----
-
-## 2) High-level Observations (qualitative)
-- **Package updates:** Please review the *Upgradable Packages* section per host. If a host lists many upgradable packages, schedule patching accordingly (Critical/High first).  
-- **Network exposure:** See *Open Ports* per host (from `ss -tulnp`). Validate each published port is required, and restrict externally where possible.  
-- **SSHD hardening:** Confirm `PasswordAuthentication no`, acceptable ciphers/MACs, and non‑standard SSH port is documented.  
-- **Service footprint:** Review `systemd` service list (disabled/unused services should be removed or disabled).
-
-> These observations are guidance; treat them as inputs to your VA remediation plan (SOC 2 CC7.1/CC7.2).
-
----
-
-{% for h in va_data | sort(attribute='host') %}
-## Appendix – {{ h.host | default('') }} ({{ h.ip | default('unknown ip') }})
-
-**Kernel**
-```text
-{{ h.kernel | default('') }}
+## Hosts
+{% for host in va_data %}
+### {{ loop.index }}. {{ host.host | default('unknown') }} ({{ host.ip | default('n/a') }})
+- Collected at: {{ host.collected_at | default('') }}
+- Kernel: {{ host.kernel | default('') }}
+- OS Release:
 ```
-
-**OS Release**
-```text
-{{ h.os_release | default('') }}
+{{ host.os_release | default('') }}
 ```
-
-**Upgradable Packages**
-```text
-{{ h.upgradable | default('') }}
+- Upgradable Packages:
 ```
-
-**Open Ports (ss -tulnp)**
-```text
-{{ h.ports | default('') }}
+{{ host.upgradable | default('') }}
 ```
-
-**SSHD Effective Config**
-```text
-{{ h.sshd_T | default('') }}
+- Listening Ports (`ss -tulnp`):
 ```
-
-**Systemd Services**
-```text
-{{ h.services | default('') }}
+{{ host.ports | default('') }}
 ```
-
-**Security Status (pro / ubuntu-security-status)**
-```text
-{{ h.security_status | default('') }}
+- SSHD Effective Config (`sshd -T`):
 ```
-
-**Collected at:** `{{ h.collected_at | default('') }}`
-
----
+{{ host.sshd_T | default('') }}
+```
+- Services (`systemctl list-units --type=service`):
+```
+{{ host.services | default('') }}
+```
+- Ubuntu Security Status:
+```
+{{ host.security_status | default('') }}
+```
 {% endfor %}
