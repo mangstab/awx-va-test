@@ -1,5 +1,6 @@
+
 ---
-# Render MD from merged JSON or payload (no filesystem dependency)
+# Render MD (v5): scan all job_artifacts nodes for merged_json_payload, then fallback to globals and file
 - name: Render Multi-Server VA Report (Markdown)
   hosts: localhost
   gather_facts: false
@@ -8,38 +9,49 @@
     title: "Internal Vulnerability Assessment – Multi-Server"
 
   tasks:
-    - name: Resolve artifacts object (or empty)
+    - name: Capture job_artifacts (may be empty on some setups)
       set_fact:
         _artifacts: "{{ job_artifacts | default({}, true) }}"
 
-    - name: Extract payload and file hints
+    - name: Derive payload candidates from any node
       set_fact:
-        _payload: "{{ (_artifacts.get('Merge VA Result', {}) ).get('merged_json_payload', _artifacts.get('merged_json_payload', [])) }}"
-        _file: "{{ (_artifacts.get('Merge VA Result', {}) ).get('merged_json_file', _artifacts.get('merged_json_file', '')) }}"
+        _payload_candidates: >-
+          {{ (_artifacts.values() | list | map('dict2items') | list
+              | map('selectattr','key','equalto','merged_json_payload')
+              | map('list') | list
+              | sum(start=[])
+              | map(attribute='value') | list) | default([]) }}
+        _file_candidates: >-
+          {{ (_artifacts.values() | list | map('dict2items') | list
+              | map('selectattr','key','equalto','merged_json_file')
+              | map('list') | list
+              | sum(start=[])
+              | map(attribute='value') | list) | default([]) }}
 
-    - name: Decide source
+    - name: Include global keys (if present)
       set_fact:
-        use_payload: "{{ (_payload | length) > 0 }}"
-        merged_file: "{{ _file if _file else (lookup('env','MERGED_JSON_FILE') | default('/runner/va_results/awx_va_merged.json', true)) }}"
+        _payload_candidates: "{{ _payload_candidates + [ _artifacts.get('merged_json_payload', []) ] }}"
+        _file_candidates: "{{ _file_candidates + [ _artifacts.get('merged_json_file', '') ] }}"
 
-    - name: When using payload, set va_data directly
-      when: use_payload
+    - name: Pick first non-empty payload or file
       set_fact:
-        va_data: "{{ _payload }}"
+        va_data: "{{ (_payload_candidates | select('length') | list | first) | default([]) }}"
+        merged_file: "{{ (_file_candidates | select('string') | select('length') | list | first) | default(lookup('env','MERGED_JSON_FILE') | default('/runner/va_results/awx_va_merged.json', true)) }}"
 
-    - name: When using file, validate exists
-      when: not use_payload
+    - name: If payload is empty, try file path
+      when: (va_data | length) == 0
       stat:
         path: "{{ merged_file }}"
       register: mf
 
-    - name: Fail if merged file missing (file mode)
-      when: not use_payload and (not mf.stat.exists)
+    - name: Fail if neither payload nor file available
+      when: (va_data | length) == 0 and (not mf.stat.exists)
       fail:
-        msg: "Merged JSON file not found: {{ merged_file }}"
+        msg: >-
+          No VA data to render. job_artifacts keys={{ _artifacts.keys() | list }}; tried payloads on all nodes and file {{ merged_file }}.
 
-    - name: Read merged JSON (file mode)
-      when: not use_payload
+    - name: Read merged JSON from file when payload empty but file exists
+      when: (va_data | length) == 0 and mf.stat.exists
       set_fact:
         va_data: "{{ lookup('file', merged_file) | from_json }}"
 
